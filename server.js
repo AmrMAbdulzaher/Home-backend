@@ -71,38 +71,65 @@ app.post("/login", async (req, res) => {
 });
 
 app.post("/submit-order", (req, res) => {
-    const { username, items } = req.body;
-    const sql = "INSERT INTO orders (username, item_name, quantity) VALUES ?";
-    const values = items.map((item) => [username, item.itemName, item.itemQuantity]);
-    db.query(sql, [values], (err) => {
-        if (err) throw err;
-        res.json({ success: true, message: "Order submitted successfully!" });
-    });
+  const { username, items } = req.body;
+
+  // Fetch the user_id for the given username
+  const getUserSql = "SELECT id FROM users WHERE username = ?";
+  db.query(getUserSql, [username], (err, userResult) => {
+      if (err) {
+          console.error("Database error:", err);
+          return res.status(500).json({ success: false, message: "Database error" });
+      }
+
+      if (userResult.length === 0) {
+          return res.status(400).json({ success: false, message: "User not found." });
+      }
+
+      const user_id = userResult[0].id;
+
+      // Insert the order with the user_id
+      const sql = "INSERT INTO orders (user_id, username, item_name, quantity) VALUES ?";
+      const values = items.map((item) => [user_id, username, item.itemName, item.itemQuantity]);
+
+      db.query(sql, [values], (err) => {
+          if (err) throw err;
+          res.json({ success: true, message: "Order submitted successfully!" });
+      });
+  });
 });
 
 app.get("/today-requests", (req, res) => {
-    const sql = "SELECT * FROM orders WHERE DATE(timestamp) = CURDATE()";
-    db.query(sql, (err, result) => {
-        if (err) throw err;
-        res.json(result);
-    });
+  const sql = `
+      SELECT o.id, o.item_name, o.quantity, o.timestamp, u.username 
+      FROM orders o
+      JOIN users u ON o.user_id = u.id
+      WHERE DATE(o.timestamp) = CURDATE()
+  `;
+  db.query(sql, (err, result) => {
+      if (err) throw err;
+      res.json(result);
+  });
 });
 
 app.get("/archives", (req, res) => {
-    const { day } = req.query;
-    let sql = "SELECT * FROM archives";
-    if (day) {
-        sql += " WHERE DATE(timestamp) = ?";
-        db.query(sql, [day], (err, result) => {
-            if (err) throw err;
-            res.json(result);
-        });
-    } else {
-        db.query(sql, (err, result) => {
-            if (err) throw err;
-            res.json(result);
-        });
-    }
+  const { day } = req.query;
+  let sql = `
+      SELECT a.id, a.item_name, a.quantity, a.timestamp, u.username 
+      FROM archives a
+      JOIN users u ON a.user_id = u.id
+  `;
+  if (day) {
+      sql += " WHERE DATE(a.timestamp) = ?";
+      db.query(sql, [day], (err, result) => {
+          if (err) throw err;
+          res.json(result);
+      });
+  } else {
+      db.query(sql, (err, result) => {
+          if (err) throw err;
+          res.json(result);
+      });
+  }
 });
 
 // Start the server
