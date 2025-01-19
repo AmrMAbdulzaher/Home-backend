@@ -5,6 +5,7 @@ const cors = require("cors");
 const bcrypt = require("bcryptjs");
 
 const app = express();
+console.log(process.env.TZ); // Outputs: UTC
 
 // Middleware
 app.use(bodyParser.json());
