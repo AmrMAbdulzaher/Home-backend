@@ -24,11 +24,9 @@ db.connect((err) => {
     console.log("MySQL Connected!");
 });
 
-// Routes
-
-
+// CORS Configuration
 const corsOptions = {
-    origin: "https://homeforamr.vercel.app", 
+    origin: "https://homeforamr.vercel.app",
     optionsSuccessStatus: 200,
 };
 
@@ -38,18 +36,36 @@ app.use(cors(corsOptions));
 app.post("/register", async (req, res) => {
     const { username, password } = req.body;
 
+    // Validate input
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: "Username and password are required." });
+    }
+
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const sql = "INSERT INTO users (username, password) VALUES (?, ?)";
-    db.query(sql, [username, hashedPassword], (err, result) => {
+    // Check if the username already exists
+    const checkUserSql = "SELECT * FROM users WHERE username = ?";
+    db.query(checkUserSql, [username], (err, result) => {
         if (err) {
-            if (err.code === "ER_DUP_ENTRY") {
-                return res.status(400).json({ success: false, message: "Username already exists" });
-            }
-            throw err;
+            console.error("Database error:", err);
+            return res.status(500).json({ success: false, message: "Database error" });
         }
-        res.json({ success: true, message: "User registered successfully!" });
+
+        if (result.length > 0) {
+            return res.status(400).json({ success: false, message: "Username already exists." });
+        }
+
+        // Insert the new user into the database
+        const insertUserSql = "INSERT INTO users (username, password) VALUES (?, ?)";
+        db.query(insertUserSql, [username, hashedPassword], (err, result) => {
+            if (err) {
+                console.error("Database error:", err);
+                return res.status(500).json({ success: false, message: "Database error" });
+            }
+
+            res.json({ success: true, message: "User registered successfully!" });
+        });
     });
 });
 
