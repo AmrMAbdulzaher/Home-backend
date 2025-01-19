@@ -101,10 +101,15 @@ app.post("/submit-order", (req, res) => {
 
 app.get("/today-requests", (req, res) => {
   const sql = `
-      SELECT o.id, o.item_name, o.quantity, o.timestamp, u.username 
+      SELECT 
+          o.id, 
+          o.item_name, 
+          o.quantity, 
+          CONVERT_TZ(o.timestamp, '+01:00', '+02:00') AS local_timestamp, 
+          u.username 
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      WHERE DATE(o.timestamp) = CURDATE()
+      WHERE DATE(CONVERT_TZ(o.timestamp, '+01:00', '+02:00')) = CURDATE()
   `;
   db.query(sql, (err, result) => {
       if (err) throw err;
