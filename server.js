@@ -119,13 +119,13 @@ app.get("/today-requests", (req, res) => {
           o.item_name, 
           o.quantity, 
           DATE_FORMAT(
-              CONVERT_TZ(o.timestamp, '+00:00', '+02:00'), 
+              CONVERT_TZ(o.timestamp, '+01:00', '+02:00'), 
               '%d/%m/%Y, %h:%i:%s %p'
           ) AS local_timestamp, 
           u.username 
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      WHERE DATE(CONVERT_TZ(o.timestamp, '+00:00', '+02:00')) = ?
+      WHERE DATE(CONVERT_TZ(o.timestamp, '+01:00', '+02:00')) = ?
   `;
   db.query(sql, [localDate], (err, result) => {
     if (err) throw err;
