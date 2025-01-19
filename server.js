@@ -25,7 +25,7 @@ db.connect((err) => {
 
 // CORS Configuration
 const corsOptions = {
-  origin: "https://homeforamr.vercel.app",
+  origin: "https://homeofamr.vercel.app",
   optionsSuccessStatus: 200,
 };
 
