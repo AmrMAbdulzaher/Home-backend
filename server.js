@@ -115,17 +115,7 @@ app.get("/archives", (req, res) => {
   const sql = "SELECT DISTINCT DATE(timestamp) AS archive_date FROM archives ORDER BY archive_date DESC";
   db.query(sql, (err, result) => {
       if (err) throw err;
-
-      // Format dates as day/month/year
-      const formattedResult = result.map((row) => {
-          const date = new Date(row.archive_date);
-          const day = String(date.getDate()).padStart(2, '0'); // Ensure 2 digits
-          const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
-          const year = date.getFullYear();
-          return { archive_date: `${day}/${month}/${year}` };
-      });
-
-      res.json(formattedResult);
+      res.json(result);
   });
 });
 
