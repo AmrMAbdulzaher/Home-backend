@@ -112,24 +112,35 @@ app.get("/today-requests", (req, res) => {
 });
 
 app.get("/archives", (req, res) => {
-  const { day } = req.query;
-  let sql = `
-      SELECT a.id, a.item_name, a.quantity, a.timestamp, u.username 
+  const sql = "SELECT DISTINCT DATE(timestamp) AS archive_date FROM archives ORDER BY archive_date DESC";
+  db.query(sql, (err, result) => {
+      if (err) throw err;
+
+      // Format dates as day/month/year
+      const formattedResult = result.map((row) => {
+          const date = new Date(row.archive_date);
+          const day = String(date.getDate()).padStart(2, '0'); // Ensure 2 digits
+          const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+          const year = date.getFullYear();
+          return { archive_date: `${day}/${month}/${year}` };
+      });
+
+      res.json(formattedResult);
+  });
+});
+
+app.get("/archive-details", (req, res) => {
+  const { date } = req.query;
+  const sql = `
+      SELECT a.item_name, a.quantity, a.timestamp, u.username 
       FROM archives a
       JOIN users u ON a.user_id = u.id
+      WHERE DATE(a.timestamp) = ?
   `;
-  if (day) {
-      sql += " WHERE DATE(a.timestamp) = ?";
-      db.query(sql, [day], (err, result) => {
-          if (err) throw err;
-          res.json(result);
-      });
-  } else {
-      db.query(sql, (err, result) => {
-          if (err) throw err;
-          res.json(result);
-      });
-  }
+  db.query(sql, [date], (err, result) => {
+      if (err) throw err;
+      res.json(result);
+  });
 });
 
 // Start the server
