@@ -3,9 +3,10 @@ const mysql = require("mysql");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const cron = require("node-cron"); // For cron jobs
+const moment = require("moment-timezone"); // For timezone handling
 
 const app = express();
-console.log(process.env.TZ); // Outputs: UTC
 
 // Middleware
 app.use(bodyParser.json());
@@ -20,55 +21,54 @@ const db = mysql.createConnection({
   port: process.env.PORT,
 });
 
-
 db.connect((err) => {
-    if (err) throw err;
-    console.log("MySQL Connected!");
+  if (err) throw err;
+  console.log("MySQL Connected!");
 });
 
 // Routes
 app.post("/register", async (req, res) => {
-    const { username, password } = req.body;
-    if (!username || !password) {
-        return res.status(400).json({ success: false, message: "Username and password are required." });
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: "Username and password are required." });
+  }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const checkUserSql = "SELECT * FROM users WHERE username = ?";
+  db.query(checkUserSql, [username], (err, result) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ success: false, message: "Database error" });
     }
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const checkUserSql = "SELECT * FROM users WHERE username = ?";
-    db.query(checkUserSql, [username], (err, result) => {
-        if (err) {
-            console.error("Database error:", err);
-            return res.status(500).json({ success: false, message: "Database error" });
-        }
-        if (result.length > 0) {
-            return res.status(400).json({ success: false, message: "Username already exists." });
-        }
-        const insertUserSql = "INSERT INTO users (username, password) VALUES (?, ?)";
-        db.query(insertUserSql, [username, hashedPassword], (err) => {
-            if (err) {
-                console.error("Database error:", err);
-                return res.status(500).json({ success: false, message: "Database error" });
-            }
-            res.json({ success: true, message: "User registered successfully!" });
-        });
+    if (result.length > 0) {
+      return res.status(400).json({ success: false, message: "Username already exists." });
+    }
+    const insertUserSql = "INSERT INTO users (username, password) VALUES (?, ?)";
+    db.query(insertUserSql, [username, hashedPassword], (err) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ success: false, message: "Database error" });
+      }
+      res.json({ success: true, message: "User registered successfully!" });
     });
+  });
 });
 
 app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
-    const sql = "SELECT * FROM users WHERE username = ?";
-    db.query(sql, [username], async (err, result) => {
-        if (err) throw err;
-        if (result.length > 0) {
-            const isValidPassword = await bcrypt.compare(password, result[0].password);
-            if (isValidPassword) {
-                res.json({ success: true, username });
-            } else {
-                res.status(401).json({ success: false, message: "Invalid credentials" });
-            }
-        } else {
-            res.status(401).json({ success: false, message: "User not found" });
-        }
-    });
+  const { username, password } = req.body;
+  const sql = "SELECT * FROM users WHERE username = ?";
+  db.query(sql, [username], async (err, result) => {
+    if (err) throw err;
+    if (result.length > 0) {
+      const isValidPassword = await bcrypt.compare(password, result[0].password);
+      if (isValidPassword) {
+        res.json({ success: true, username });
+      } else {
+        res.status(401).json({ success: false, message: "Invalid credentials" });
+      }
+    } else {
+      res.status(401).json({ success: false, message: "User not found" });
+    }
+  });
 });
 
 app.post("/submit-order", (req, res) => {
@@ -77,51 +77,47 @@ app.post("/submit-order", (req, res) => {
   // Fetch the user_id for the given username
   const getUserSql = "SELECT id FROM users WHERE username = ?";
   db.query(getUserSql, [username], (err, userResult) => {
-      if (err) {
-          console.error("Database error:", err);
-          return res.status(500).json({ success: false, message: "Database error" });
-      }
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ success: false, message: "Database error" });
+    }
 
-      if (userResult.length === 0) {
-          return res.status(400).json({ success: false, message: "User not found." });
-      }
+    if (userResult.length === 0) {
+      return res.status(400).json({ success: false, message: "User not found." });
+    }
 
-      const user_id = userResult[0].id;
+    const user_id = userResult[0].id;
 
-      // Insert the order with the user_id
-      const sql = "INSERT INTO orders (user_id, username, item_name, quantity) VALUES ?";
-      const values = items.map((item) => [user_id, username, item.itemName, item.itemQuantity]);
+    // Insert the order with the user_id
+    const sql = "INSERT INTO orders (user_id, username, item_name, quantity) VALUES ?";
+    const values = items.map((item) => [user_id, username, item.itemName, item.itemQuantity]);
 
-      db.query(sql, [values], (err) => {
-          if (err) throw err;
-          res.json({ success: true, message: "Order submitted successfully!" });
-      });
+    db.query(sql, [values], (err) => {
+      if (err) throw err;
+      res.json({ success: true, message: "Order submitted successfully!" });
+    });
   });
 });
 
 app.get("/today-requests", (req, res) => {
+  const localDate = moment().tz("Africa/Cairo").format("YYYY-MM-DD"); // Get today's date in Africa/Cairo
   const sql = `
-      SELECT 
-          o.id, 
-          o.item_name, 
-          o.quantity, 
-          CONVERT_TZ(o.timestamp, '+01:00', '+02:00') AS local_timestamp, 
-          u.username 
+      SELECT o.id, o.item_name, o.quantity, o.timestamp, u.username 
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      WHERE DATE(CONVERT_TZ(o.timestamp, '+01:00', '+02:00')) = CURDATE()
+      WHERE DATE(o.timestamp) = ?
   `;
-  db.query(sql, (err, result) => {
-      if (err) throw err;
-      res.json(result);
+  db.query(sql, [localDate], (err, result) => {
+    if (err) throw err;
+    res.json(result);
   });
 });
 
 app.get("/archives", (req, res) => {
   const sql = "SELECT DISTINCT DATE(timestamp) AS archive_date FROM archives ORDER BY archive_date DESC";
   db.query(sql, (err, result) => {
-      if (err) throw err;
-      res.json(result); // Returns dates in YYYY-MM-DD format
+    if (err) throw err;
+    res.json(result); // Returns dates in YYYY-MM-DD format
   });
 });
 
@@ -134,8 +130,8 @@ app.get("/archive-details", (req, res) => {
       WHERE DATE(a.timestamp) = ?
   `;
   db.query(sql, [date], (err, result) => {
-      if (err) throw err;
-      res.json(result); // Returns data with timestamps in ISO format
+    if (err) throw err;
+    res.json(result); // Returns data with timestamps in ISO format
   });
 });
 
@@ -153,45 +149,43 @@ app.post("/archive-today-requests", (req, res) => {
   `;
 
   db.query(archiveSql, (err, archiveResult) => {
+    if (err) {
+      console.error("Error archiving today's requests:", err);
+      return res.status(500).json({ success: false, message: "Error archiving today's requests" });
+    }
+
+    db.query(deleteSql, (err, deleteResult) => {
       if (err) {
-          console.error("Error archiving today's requests:", err);
-          return res.status(500).json({ success: false, message: "Error archiving today's requests" });
+        console.error("Error deleting archived orders:", err);
+        return res.status(500).json({ success: false, message: "Error deleting archived orders" });
       }
 
-      db.query(deleteSql, (err, deleteResult) => {
-          if (err) {
-              console.error("Error deleting archived orders:", err);
-              return res.status(500).json({ success: false, message: "Error deleting archived orders" });
-          }
-
-          res.json({ success: true, message: "Today's requests archived successfully!" });
-      });
+      res.json({ success: true, message: "Today's requests archived successfully!" });
+    });
   });
 });
 
+// Cron job to run every minute for testing
+cron.schedule("* * * * *", () => {
+  console.log("Running archiving task...");
 
-const cron = require('node-cron');
-
-// Schedule the archiving task to run at midnight GMT+2 every day
-cron.schedule('* * * * *', () => {
-    console.log("Running archiving task...");
-
-    fetch(`${API_BASE_URL}/archive-today-requests`, {
-        method: 'POST',
+  // Use the server's own endpoint to trigger archiving
+  fetch("http://localhost:3000/archive-today-requests", {
+    method: "POST",
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      console.log("Archiving task result:", data);
     })
-    .then(response => response.json())
-    .then(data => {
-        console.log("Archiving task result:", data);
-    })
-    .catch(error => {
-        console.error("Error running archiving task:", error);
+    .catch((error) => {
+      console.error("Error running archiving task:", error);
     });
 }, {
-    timezone: "Africa/Cairo" // GMT+2 timezone
+  timezone: "Africa/Cairo", // Set cron job timezone to Africa/Cairo
 });
 
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
