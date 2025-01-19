@@ -133,6 +133,57 @@ app.get("/archive-details", (req, res) => {
   });
 });
 
+app.post("/archive-today-requests", (req, res) => {
+  const archiveSql = `
+      INSERT INTO archives (user_id, item_name, quantity, timestamp)
+      SELECT user_id, item_name, quantity, timestamp
+      FROM orders
+      WHERE DATE(timestamp) = CURDATE() - INTERVAL 1 DAY
+  `;
+
+  const deleteSql = `
+      DELETE FROM orders
+      WHERE DATE(timestamp) = CURDATE() - INTERVAL 1 DAY
+  `;
+
+  db.query(archiveSql, (err, archiveResult) => {
+      if (err) {
+          console.error("Error archiving today's requests:", err);
+          return res.status(500).json({ success: false, message: "Error archiving today's requests" });
+      }
+
+      db.query(deleteSql, (err, deleteResult) => {
+          if (err) {
+              console.error("Error deleting archived orders:", err);
+              return res.status(500).json({ success: false, message: "Error deleting archived orders" });
+          }
+
+          res.json({ success: true, message: "Today's requests archived successfully!" });
+      });
+  });
+});
+
+
+const cron = require('node-cron');
+
+// Schedule the archiving task to run at midnight GMT+2 every day
+cron.schedule('0 0 * * *', () => {
+    console.log("Running archiving task...");
+
+    fetch(`${API_BASE_URL}/archive-today-requests`, {
+        method: 'POST',
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Archiving task result:", data);
+    })
+    .catch(error => {
+        console.error("Error running archiving task:", error);
+    });
+}, {
+    timezone: "Africa/Cairo" // GMT+2 timezone
+});
+
 // Start the server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
