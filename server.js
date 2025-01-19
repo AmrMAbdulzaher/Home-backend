@@ -160,12 +160,12 @@ app.post("/archive-today-requests", (req, res) => {
       INSERT INTO archives (user_id, item_name, quantity, timestamp)
       SELECT user_id, item_name, quantity, timestamp
       FROM orders
-      WHERE DATE(CONVERT_TZ(timestamp, '+00:00', '+02:00')) = CURDATE()
+      WHERE DATE(CONVERT_TZ(timestamp, '+01:00', '+02:00')) = CURDATE()
   `;
 
   const deleteSql = `
       DELETE FROM orders
-      WHERE DATE(CONVERT_TZ(timestamp, '+00:00', '+02:00')) = CURDATE()
+      WHERE DATE(CONVERT_TZ(timestamp, '+01:00', '+02:00')) = CURDATE()
   `;
 
   db.query(archiveSql, (err, archiveResult) => {
