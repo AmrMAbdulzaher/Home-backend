@@ -186,7 +186,7 @@ app.post("/archive-today-requests", (req, res) => {
 });
 
 // Cron job to run every minute for testing
-cron.schedule("* * * * *", () => {
+cron.schedule("0 0 * * *", () => {
   console.log("Running archiving task...");
 
   fetch(`https://home-backend-flame.vercel.app/archive-today-requests`, {
