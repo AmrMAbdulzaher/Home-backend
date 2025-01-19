@@ -26,6 +26,14 @@ db.connect((err) => {
 
 // Routes
 
+
+const corsOptions = {
+    origin: "https://homeforamr.vercel.app", 
+    optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+
 // Register User
 app.post("/register", async (req, res) => {
     const { username, password } = req.body;
