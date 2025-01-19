@@ -138,12 +138,12 @@ app.post("/archive-today-requests", (req, res) => {
       INSERT INTO archives (user_id, item_name, quantity, timestamp)
       SELECT user_id, item_name, quantity, timestamp
       FROM orders
-      WHERE DATE(timestamp) = CURDATE() - INTERVAL 1 DAY
+      WHERE DATE(timestamp) = CURDATE()
   `;
 
   const deleteSql = `
       DELETE FROM orders
-      WHERE DATE(timestamp) = CURDATE() - INTERVAL 1 DAY
+      WHERE DATE(timestamp) = CURDATE()
   `;
 
   db.query(archiveSql, (err, archiveResult) => {
@@ -167,7 +167,7 @@ app.post("/archive-today-requests", (req, res) => {
 const cron = require('node-cron');
 
 // Schedule the archiving task to run at midnight GMT+2 every day
-cron.schedule('0 0 * * *', () => {
+cron.schedule('* * * * *', () => {
     console.log("Running archiving task...");
 
     fetch(`${API_BASE_URL}/archive-today-requests`, {
