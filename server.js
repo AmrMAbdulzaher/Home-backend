@@ -125,7 +125,7 @@ app.get("/today-requests", (req, res) => {
           u.username 
       FROM orders o
       JOIN users u ON o.user_id = u.id
-      WHERE DATE(CONVERT_TZ(o.timestamp, '+01:00', '+02:00')) = CURDATE
+      WHERE DATE(CONVERT_TZ(o.timestamp, '+01:00', '+02:00')) = CURDATE()
   `;
   db.query(sql, [localDate], (err, result) => {
     if (err) throw err;
